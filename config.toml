@@ -1,0 +1,57 @@
+# agent-groundwork runtime configuration.
+# See SPEC.md for the meaning of each field. All fields validated by
+# agent_groundwork/config.py at load time.
+
+[agent]
+sandbox_root = "./sandbox"
+system_prompt_path = "./sandbox/AGENT.md"
+max_iterations = 8
+
+[provider]
+backend = "ollama"
+host = "http://localhost:11434"
+
+[provider.ollama]
+# How long Ollama keeps a model warm in RAM after the last request.
+# Generous to avoid cold-load latency between turns.
+keep_alive = "30m"
+
+[model]
+# The model the agent runs against. Swap freely.
+# Defaults are placeholders pending Phase 2 bakeoff results.
+name = "gemma4:e4b"
+tool_call_mode = "native"  # "native" or "prompted"
+
+[compaction]
+# Trigger compaction when EITHER threshold is exceeded.
+trigger_messages = 10
+trigger_tokens = 4000
+
+# Number of most-recent messages to keep verbatim after compaction.
+recent_window = 6
+
+# Empty = use the main model for summarization (default; safe).
+# Set to a smaller model name to use a separate summarizer ONLY if
+# both models can be co-resident in RAM. Otherwise the model unload/reload
+# cost will dwarf any savings. See SPEC.md "RAM trade-off note".
+summarization_model = ""
+
+# Where session summaries get persisted as markdown files.
+summary_dir = "./sandbox/conversations"
+
+[tracing]
+trace_dir = "./traces"
+
+[bakeoff]
+result_dir = "./bakeoff_results"
+scenario_dir = "./agent_groundwork/bakeoff/scenarios"
+
+# The model shortlist for the first bakeoff run. See SPEC.md "Bakeoff" and
+# IMPLEMENTATION_PLAN.md Phase 2. Edit freely as new models become interesting.
+candidate_models = [
+  "gemma4:e4b",
+  "gemma4:26b",
+  "qwen3:8b",
+  "ministral-3:14b",
+  "gemma3:12b",
+]

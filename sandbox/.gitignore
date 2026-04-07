@@ -1,0 +1,5 @@
+# Everything in the sandbox is the agent's working data.
+# Commit only the starter system prompt and this gitignore itself.
+*
+!.gitignore
+!AGENT.md

@@ -1,0 +1,22 @@
+[project]
+name = "agent-groundwork"
+version = "0.1.0"
+description = "A learning-project local agent built on Ollama for the CPU-only era"
+requires-python = ">=3.11"
+dependencies = [
+    "ollama>=0.4.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent_groundwork"]
