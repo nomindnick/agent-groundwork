@@ -10,7 +10,7 @@ Read **SPEC.md** for the system design and **IMPLEMENTATION_PLAN.md** for the bu
 
 ## Current phase
 
-**Phase 0 — Repository skeleton.** The next thing to build is **Phase 1** (provider and tool framework). See `IMPLEMENTATION_PLAN.md`.
+**Phase 1 — Provider and tool framework, complete.** Provider abstraction (Ollama, both native and prompted tool-call modes), tool framework (registry + five file tools + `ask_user`), sandbox path guard, config loader, and `tests/test_paths.py` + `tests/test_prompted_parser.py` are in place. The next thing to build is **Phase 2** (bakeoff harness + first bakeoff run). See `IMPLEMENTATION_PLAN.md`.
 
 (Update this section as the project moves through phases.)
 
