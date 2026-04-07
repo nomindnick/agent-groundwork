@@ -37,6 +37,7 @@ Each "build" phase ends in a usable artifact. Each "use" phase ends in lessons t
 Done as part of the planning conversation that produced SPEC.md, this file, and CLAUDE.md.
 
 **Deliverables:**
+
 - Project directory structure
 - `SPEC.md`, `IMPLEMENTATION_PLAN.md`, `CLAUDE.md`
 - `pyproject.toml` with chosen dependencies
@@ -56,11 +57,13 @@ Build the two layers that the bakeoff and the agent both depend on. This is the 
 **Deliverables:**
 
 1. **`agent_groundwork/providers/base.py`**
+   
    - `Message`, `ChatResult`, `ChatChunk`, `ToolSchema`, `ToolCall` types (Pydantic models)
    - `Provider` protocol with `chat()` and `stream()` methods
    - `ParseError` and friends for surfacing tool-call failures cleanly
 
 2. **`agent_groundwork/providers/ollama.py`**
+   
    - Ollama HTTP client (use the official `ollama` Python package or raw `httpx` — whichever is simpler at the time)
    - `chat()` and `stream()` implementations
    - Both `tool_call_mode="native"` (uses Ollama's `tools=` parameter) and `tool_call_mode="prompted"` (injects tool descriptions into the system prompt and parses fenced JSON code blocks out of the response)
@@ -69,17 +72,20 @@ Build the two layers that the bakeoff and the agent both depend on. This is the 
    - Robust parse failure reporting — the bakeoff needs to know *why* a call failed, not just that it did
 
 3. **`agent_groundwork/tools/base.py`**
+   
    - `Tool` protocol
    - `ToolResult` type (`ok`, `data`, `error`)
    - `ToolRegistry` — register tools, look them up by name, render schemas to native or prompted form
    - Schema rendering: takes a Pydantic model and produces both an Ollama-style dict and a markdown description block for prompted mode
 
 4. **`agent_groundwork/paths.py`**
+   
    - `validate_path(root: Path, candidate: str) -> Path` function
    - Resolves to absolute, asserts containment under `root`, rejects symlink escapes
    - Comprehensive unit tests (the one place a unit test is non-optional in this phase — sandbox escape would be a real bug)
 
 5. **`agent_groundwork/tools/files.py`**
+   
    - `list_files`, `read_file`, `write_file`, `edit_file`, `search_files`
    - All paths validated through `paths.py`
    - `search_files` shells out to `rg` if available, falls back to a Python implementation if not
@@ -87,18 +93,21 @@ Build the two layers that the bakeoff and the agent both depend on. This is the 
    - `write_file` produces a distinguishable trace event when overwriting an existing file
 
 6. **`agent_groundwork/tools/interaction.py`**
+   
    - `ask_user` tool
    - Takes a `question: str`, returns the user's response in `data`
    - Implementation calls into a `user_input_provider` callable injected at construction time. In Phase 1 this is just a stub that returns canned answers; the CLI will provide the real one in Phase 4.
 
 7. **`agent_groundwork/config.py`**
+   
    - Pydantic models matching the `config.toml` schema
    - `load_config(path: str) -> Config` function
 
 **Dependencies:** Phase 0.
 
 **Done when:**
-- You can write a 30-line script that loads a tool registry and calls a model with it via either tool-call mode against any installed Ollama model.
+
+- You can write a script that loads a tool registry and calls a model with it via either tool-call mode against any installed Ollama model.
 - The same script writes a file inside the sandbox and refuses to write outside it.
 - `pytest agent_groundwork/paths.py` (or equivalent) passes with sandbox-escape attempts covered.
 
@@ -111,10 +120,12 @@ Use Phase 1's pieces to evaluate the candidate models. The bakeoff is the first 
 **Deliverables:**
 
 1. **`agent_groundwork/bakeoff/scenarios/`**
+   
    - One YAML file per scenario from the SPEC list (`single_tool`, `two_step`, `search_summarize`, `multi_step_edit`, `no_tool_needed`, `ambiguous_request`, `impossible_request`, `error_recovery`, `long_context`)
    - Each scenario specifies: name, description, available tools (real or mocked), pre-seeded sandbox state, the user prompt, and a scoring rubric (`expected_tool_calls`, `expected_no_tool_calls`, `expected_to_ask_user`, etc.)
 
 2. **`agent_groundwork/bakeoff/harness.py`**
+   
    - `run_bakeoff(models, scenarios) -> Results`
    - For each `(model, mode, scenario)` cell:
      - Set up a clean temp sandbox with any seeded state
@@ -124,6 +135,7 @@ Use Phase 1's pieces to evaluate the candidate models. The bakeoff is the first 
    - Cold-load measurement: a separate run that times the *first* call to each model after a fresh Ollama state
 
 3. **`agent_groundwork/bakeoff/report.py`**
+   
    - Reads the JSONL from a bakeoff run
    - Generates a markdown report with:
      - Per-model summary table (latency, tokens/sec, scenario success rate, tool-call mode that worked best)
@@ -133,12 +145,14 @@ Use Phase 1's pieces to evaluate the candidate models. The bakeoff is the first 
    - Output: `bakeoff_results/<timestamp>/report.md` plus the underlying JSONL
 
 4. **Entry point: `python -m agent_groundwork.bakeoff`**
+   
    - Reads candidate models from `config.toml`
    - Runs the harness, generates the report
 
 **Dependencies:** Phase 1.
 
 **Done when:**
+
 - A full bakeoff run completes against the SPEC's proposed shortlist (`gemma4:e4b`, `gemma4:26b`, `qwen3:8b`, `ministral-3:14b`, `gemma3:12b`).
 - The generated `report.md` is human-readable and ranks the models on each scoring axis.
 - **Decision point:** based on the report, pick **3-5 finalist models** to carry into Phase 3+. Document the choice in `bakeoff_results/<timestamp>/decision.md` with rationale.
@@ -152,14 +166,17 @@ Build the loop that the bakeoff has now informed.
 **Deliverables:**
 
 1. **`agent_groundwork/agent/messages.py`**
+   
    - `Message` type (role, content, tool_calls, tool_call_id, etc.)
    - Conversion helpers for the provider layer
 
 2. **`agent_groundwork/agent/events.py`**
+   
    - All event types from the SPEC: `TextChunk`, `ToolCallStarted`, `ToolCallResult`, `CompactionEvent`, `SystemPromptEdited`, `Done`, `Error`
    - Each is a small dataclass / Pydantic model
 
 3. **`agent_groundwork/agent/loop.py`**
+   
    - `Agent` class constructed with: provider, tool registry, compactor, tracer, system prompt, config
    - `async def run(user_message: str) -> AsyncIterator[Event]` matching the SPEC pseudocode
    - Iteration cap (configurable, default 8)
@@ -168,6 +185,7 @@ Build the loop that the bakeoff has now informed.
    - All output flows through events; *no print statements anywhere*
 
 4. **`agent_groundwork/agent/compaction.py`**
+   
    - `Compactor` protocol
    - `RollingSummaryCompactor` default implementation
    - Triggers on message count or estimated token count (whichever first)
@@ -177,11 +195,13 @@ Build the loop that the bakeoff has now informed.
    - **Always logs pre/post snapshots to the trace** for auditing
 
 5. **`agent_groundwork/tracing.py`**
+   
    - `Tracer` class that opens a session JSONL file and writes events
    - Records: provider calls (with timing/tokens), tool calls (with timing), compaction (with pre/post snapshots), all agent events
    - Append-only, line-oriented, no buffering games
 
 6. **Smoketest: `scripts/agent_smoketest.py`**
+   
    - A throwaway script that constructs an agent, runs a single hard-coded user message, and prints events
    - Not the CLI — just enough to verify the loop end-to-end without the real frontend
    - Useful for verifying tool dispatch, compaction triggering, and trace output before Phase 4
@@ -189,6 +209,7 @@ Build the loop that the bakeoff has now informed.
 **Dependencies:** Phase 1, Phase 2 (you need finalist models picked).
 
 **Done when:**
+
 - The smoketest runs an agent against a real Ollama model with real file tools, completes a multi-step task, and produces a JSONL trace.
 - Forcing the iteration cap (e.g., a deliberately impossible request) produces a clean `Error` event, not a hang.
 - Triggering compaction (by feeding many messages) produces a `summary.md` file in the session directory and re-uses it on the next call.
@@ -202,6 +223,7 @@ Wrap the agent core in a usable interface.
 **Deliverables:**
 
 1. **`agent_groundwork/cli.py`**
+   
    - `python -m agent_groundwork` entry point
    - Loads config, constructs provider/tools/compactor/tracer/agent
    - Provides a `user_input_provider` that reads from stdin (used by `ask_user`)
@@ -218,16 +240,19 @@ Wrap the agent core in a usable interface.
    - On exit, prints the trace file path
 
 2. **Wire `ask_user` to the CLI's input provider**
+   
    - When the agent calls `ask_user`, the dispatcher invokes the provider, which prints the question and reads stdin
    - The result becomes the tool's `ToolResult.data`
 
 3. **Realistic `sandbox/AGENT.md`**
+   
    - The starter file is a placeholder. Phase 4 writes the *real* version: who the agent is, what tools it has, when to ask vs guess, the convention that it maintains its own index, behavior on ambiguous requests, etc.
    - System prompt iteration is the main activity in Phase 5 — Phase 4 just produces the first version that's good enough to start using.
 
 **Dependencies:** Phase 3.
 
 **Done when:**
+
 - `python -m agent_groundwork` starts a chat where you can ask the agent to write notes, search them, edit them, etc., and it works on at least one finalist model.
 - The agent successfully calls `ask_user` mid-task and the conversation continues after you answer.
 - Trace files are written and inspectable.
@@ -239,6 +264,7 @@ Wrap the agent core in a usable interface.
 Not really a "build" phase. This is the use-and-tune phase that produces the actual learnings the project exists for.
 
 **Activities:**
+
 - Use the agent for a week of low-stakes tasks (note-taking, brainstorming, organizing the sandbox itself)
 - Re-run the bakeoff if any new models drop, or if you change tool definitions
 - Iterate on `AGENT.md`: where does the agent guess wrong? Where does it forget what it has? Where is the compactor losing important state?
