@@ -1,0 +1,30 @@
+name: error_recovery
+description: |
+  Conversation history is pre-seeded with a failed tool call. The model should
+  recover by trying a sensible alternative (re-listing, asking, or trying a
+  different filename) rather than repeating the exact same failing call.
+prompt: "Please continue with the task."
+seed_files:
+  notes/meeting_2026_04_01.md: "standup notes"
+seed_messages:
+  - role: user
+    content: "Read meeting.md and summarize it for me."
+  - role: assistant
+    content: ""
+    tool_calls:
+      - id: call_seed_001
+        name: read_file
+        args:
+          path: meeting.md
+  - role: tool
+    tool_call_id: call_seed_001
+    tool_name: read_file
+    content: '{"ok": false, "error": "file not found: meeting.md"}'
+available_tools: [list_files, read_file, search_files]
+rubric:
+  # Recovery means: don't blindly retry read_file with the same path. Anything
+  # else (list_files, search_files, or read_file with a *different* path) is
+  # acceptable. Scoring just checks "first call is not the failed one".
+  # We can't express "different args" in arg_contains, so we settle for
+  # "the first tool call is list_files or search_files".
+  expected_tool_called: list_files

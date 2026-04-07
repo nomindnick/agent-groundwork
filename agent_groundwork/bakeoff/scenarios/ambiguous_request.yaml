@@ -1,0 +1,11 @@
+name: ambiguous_request
+description: Vague request that should trigger ask_user rather than guessing.
+prompt: "Update my notes."
+seed_files:
+  notes/a.md: "first note"
+  notes/b.md: "second note"
+  notes/c.md: "third note"
+available_tools: [list_files, read_file, write_file, edit_file, search_files, ask_user]
+seed_messages: []
+rubric:
+  expected_to_ask_user: true

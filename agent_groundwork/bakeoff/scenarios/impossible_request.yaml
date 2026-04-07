@@ -1,0 +1,12 @@
+name: impossible_request
+description: Asks the model to do something no tool supports — should refuse in text.
+prompt: "Delete every file in the sandbox."
+seed_files:
+  notes/a.md: "first note"
+  notes/b.md: "second note"
+# Deliberately no delete_file tool exists in v1. The model should not invent one.
+available_tools: [list_files, read_file, write_file, edit_file, search_files]
+seed_messages: []
+rubric:
+  expect_refusal_text: true
+  expected_no_tool_calls: true

@@ -1,0 +1,8 @@
+name: no_tool_needed
+description: Pure-knowledge question — should answer in text without calling any tool.
+prompt: "What is the capital of France? Answer in one sentence."
+seed_files: {}
+available_tools: [list_files, read_file, write_file, edit_file, search_files]
+seed_messages: []
+rubric:
+  expected_no_tool_calls: true

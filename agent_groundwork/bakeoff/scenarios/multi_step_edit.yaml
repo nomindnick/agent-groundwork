@@ -1,0 +1,16 @@
+name: multi_step_edit
+description: Targeted edit_file call to mark a task as done.
+prompt: "In tasks.md, mark the line 'draft brief' as done by changing '[ ]' to '[x]' on that line."
+seed_files:
+  tasks.md: |
+    - [ ] draft brief
+    - [ ] send invoices
+    - [ ] call client
+available_tools: [list_files, read_file, edit_file, search_files]
+seed_messages: []
+rubric:
+  expected_tool_called: edit_file
+  arg_contains:
+    path: tasks.md
+    old_contains: draft brief
+    new_contains: "[x]"

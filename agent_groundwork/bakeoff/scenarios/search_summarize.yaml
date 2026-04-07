@@ -1,0 +1,19 @@
+name: search_summarize
+description: Use search_files to locate content matching a topic.
+prompt: "Find any file mentioning the Q2 budget and tell me what it says."
+seed_files:
+  notes/q2_budget.md: |
+    Q2 budget summary:
+    - marketing: $40k
+    - engineering: $120k
+    - operations: $25k
+  notes/random.md: |
+    grocery list
+    - milk
+    - eggs
+available_tools: [list_files, read_file, search_files]
+seed_messages: []
+rubric:
+  expected_tool_called: search_files
+  arg_contains:
+    query_contains: budget

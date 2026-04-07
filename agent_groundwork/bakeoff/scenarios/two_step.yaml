@@ -1,0 +1,16 @@
+name: two_step
+description: First step of a two-step task — should call list_files before reading.
+prompt: "List the files in the sandbox, then read the one whose name contains 'meeting'."
+seed_files:
+  meeting_notes.md: |
+    # 2026-04-01 standup
+    - shipped phase 1
+    - planning phase 2 bakeoff
+  todo.md: |
+    - mow lawn
+    - call mom
+available_tools: [list_files, read_file]
+seed_messages: []
+rubric:
+  # One-shot: we only see the first call. The right move is list_files first.
+  expected_tool_called: list_files

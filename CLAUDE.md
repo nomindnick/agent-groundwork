@@ -10,7 +10,7 @@ Read **SPEC.md** for the system design and **IMPLEMENTATION_PLAN.md** for the bu
 
 ## Current phase
 
-**Phase 1 — Provider and tool framework, complete.** Provider abstraction (Ollama, both native and prompted tool-call modes), tool framework (registry + five file tools + `ask_user`), sandbox path guard, config loader, and `tests/test_paths.py` + `tests/test_prompted_parser.py` are in place. The next thing to build is **Phase 2** (bakeoff harness + first bakeoff run). See `IMPLEMENTATION_PLAN.md`.
+**Phase 2 — Bakeoff harness, complete.** All Phase 1 foundations plus `agent_groundwork/bakeoff/{harness,scoring,report,__main__}.py` and 9 scenario YAMLs in `bakeoff/scenarios/`. Run with `python -m agent_groundwork.bakeoff` once `[bakeoff].candidate_models` in `config.toml` is pointed at models actually installed in Ollama. The next step is the **Phase 2 decision point**: run the bakeoff, review `bakeoff_results/<timestamp>/report.md`, pick 3-5 finalist models, write `decision.md` next to the report, then proceed to **Phase 3** (agent core).
 
 (Update this section as the project moves through phases.)
 

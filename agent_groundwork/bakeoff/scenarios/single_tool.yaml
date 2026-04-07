@@ -1,0 +1,11 @@
+name: single_tool
+description: Single write_file call to create a new file with literal content.
+prompt: "Write the word 'hello' to a file called greeting.md."
+seed_files: {}
+available_tools: [write_file]
+seed_messages: []
+rubric:
+  expected_tool_called: write_file
+  arg_contains:
+    path: greeting.md
+    content_contains: hello
