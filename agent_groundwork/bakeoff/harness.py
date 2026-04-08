@@ -288,66 +288,150 @@ async def measure_cold_load(
     return cold_load
 
 
+# =============================== resume helpers ===============================
+
+def _existing_cells(cells_path: Path) -> set[tuple[str, str, str]]:
+    """Return the set of (model, mode, scenario) triples already recorded.
+
+    Used to skip cells that have already run when appending to a result dir.
+    Errors and partial rows are silently treated as "not done" so they get re-run.
+    """
+    if not cells_path.exists():
+        return set()
+    done: set[tuple[str, str, str]] = set()
+    with cells_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            try:
+                done.add((row["model"], row["mode"], row["scenario"]))
+            except KeyError:
+                continue
+    return done
+
+
+def _existing_cold_loads(cold_path: Path) -> set[str]:
+    """Return the set of model names that already have a cold-load row."""
+    if not cold_path.exists():
+        return set()
+    done: set[str] = set()
+    with cold_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            name = row.get("model")
+            if isinstance(name, str):
+                done.add(name)
+    return done
+
+
 # =============================== top-level runner ===============================
 
-async def run_bakeoff(config: Config) -> Path:
-    """Run the full bakeoff and write JSONL + report into a timestamped dir.
+async def run_bakeoff(
+    config: Config,
+    *,
+    models_override: list[str] | None = None,
+    result_dir_override: Path | None = None,
+) -> Path:
+    """Run the bakeoff and write JSONL + report into a result dir.
+
+    By default, creates a fresh timestamped dir under `config.bakeoff.result_dir`
+    and runs every model in `config.bakeoff.candidate_models`. Both behaviors
+    can be overridden:
+
+    - `models_override`: run only these model names instead of the config list.
+      Lets you bake one model at a time without editing config.toml.
+    - `result_dir_override`: append to an existing result dir instead of making
+      a new one. Cells already present (matched by (model, mode, scenario))
+      are skipped, so re-invoking with the same dir is safe and incremental.
+      The report regenerates from the union of all cells each time.
 
     Returns the result directory path.
     """
     scenarios = load_scenarios(config.bakeoff.scenario_dir)
-    models = list(config.bakeoff.candidate_models)
+    models = list(models_override) if models_override else list(config.bakeoff.candidate_models)
+    if not models:
+        raise ValueError("no models to run — pass models_override or set candidate_models")
     modes: list[Literal["native", "prompted"]] = ["native", "prompted"]
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    result_dir = Path(config.bakeoff.result_dir) / timestamp
+    if result_dir_override is not None:
+        result_dir = Path(result_dir_override)
+    else:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        result_dir = Path(config.bakeoff.result_dir) / timestamp
     result_dir.mkdir(parents=True, exist_ok=True)
 
     cells_path = result_dir / "cells.jsonl"
     cold_path = result_dir / "cold_load.jsonl"
+
+    done_cells = _existing_cells(cells_path)
+    done_cold = _existing_cold_loads(cold_path)
 
     provider = OllamaProvider(
         host=config.provider.host,
         keep_alive=config.provider.ollama.keep_alive,
     )
 
-    total_cells = len(models) * len(modes) * len(scenarios)
+    planned_cells = [
+        (m, mode, s)
+        for m in models
+        for mode in modes
+        for s in scenarios
+        if (m, mode, s.name) not in done_cells
+    ]
+    skipped = (len(models) * len(modes) * len(scenarios)) - len(planned_cells)
     print(
-        f"[bakeoff] {len(models)} models x {len(modes)} modes x {len(scenarios)} scenarios "
-        f"= {total_cells} cells -> {result_dir}",
+        f"[bakeoff] {len(models)} model(s) x {len(modes)} modes x {len(scenarios)} scenarios "
+        f"-> {len(planned_cells)} cells to run "
+        f"({skipped} already done) -> {result_dir}",
         file=sys.stderr,
     )
 
-    # Cold-load pass.
-    print("[bakeoff] cold-load pass", file=sys.stderr)
-    with cold_path.open("a", encoding="utf-8") as cold_f:
-        for model in models:
-            print(f"[bakeoff]   cold load: {model}", file=sys.stderr)
-            cold = await measure_cold_load(config.provider.host, model)
-            cold_f.write(json.dumps(cold) + "\n")
-            cold_f.flush()
+    # Cold-load pass — skip models we've already measured.
+    cold_todo = [m for m in models if m not in done_cold]
+    if cold_todo:
+        print(
+            f"[bakeoff] cold-load pass ({len(cold_todo)} model(s); "
+            f"{len(models) - len(cold_todo)} already measured)",
+            file=sys.stderr,
+        )
+        with cold_path.open("a", encoding="utf-8") as cold_f:
+            for model in cold_todo:
+                print(f"[bakeoff]   cold load: {model}", file=sys.stderr)
+                cold = await measure_cold_load(config.provider.host, model)
+                cold_f.write(json.dumps(cold) + "\n")
+                cold_f.flush()
+    else:
+        print("[bakeoff] cold-load pass: nothing to do", file=sys.stderr)
 
     # Main pass.
-    cell_idx = 0
+    total_to_run = len(planned_cells)
     with cells_path.open("a", encoding="utf-8") as cells_f:
-        for model in models:
-            for mode in modes:
-                for scenario in scenarios:
-                    cell_idx += 1
-                    print(
-                        f"[bakeoff] cell {cell_idx}/{total_cells}: "
-                        f"{model} | {mode} | {scenario.name}",
-                        file=sys.stderr,
-                    )
-                    with TemporaryDirectory(prefix="bakeoff_") as tmp:
-                        sandbox_root = Path(tmp)
-                        result = await run_cell(
-                            provider, model, mode, scenario, sandbox_root
-                        )
-                    cells_f.write(json.dumps(result.model_dump()) + "\n")
-                    cells_f.flush()
+        for cell_idx, (model, mode, scenario) in enumerate(planned_cells, start=1):
+            print(
+                f"[bakeoff] cell {cell_idx}/{total_to_run}: "
+                f"{model} | {mode} | {scenario.name}",
+                file=sys.stderr,
+            )
+            with TemporaryDirectory(prefix="bakeoff_") as tmp:
+                sandbox_root = Path(tmp)
+                result = await run_cell(
+                    provider, model, mode, scenario, sandbox_root
+                )
+            cells_f.write(json.dumps(result.model_dump()) + "\n")
+            cells_f.flush()
 
-    # Generate the markdown report.
+    # Generate the markdown report from the union of all cells in this dir.
     from agent_groundwork.bakeoff.report import generate as generate_report
 
     report_path = generate_report(result_dir)

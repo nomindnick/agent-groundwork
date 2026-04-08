@@ -193,7 +193,7 @@ class OllamaProvider:
         tool_names = {t.name for t in tools}
 
         async for raw in stream:
-            delta, _tcs, done, p_tok, c_tok = _extract_chunk_fields(raw)
+            delta, raw_tool_calls, done, p_tok, c_tok = _extract_chunk_fields(raw)
 
             if delta:
                 if first_content_at is None:
@@ -207,6 +207,24 @@ class OllamaProvider:
                     yield ChatChunk(tool_call=event.call)
                 elif event.kind == "parse_error" and event.error is not None:
                     yield ChatChunk(parse_error=event.error)
+
+            # Models trained with native tool-call templates emit tool calls in
+            # their trained format even when we didn't pass `tools=`. Ollama's
+            # chat-template parser surfaces those as `message.tool_calls`. If
+            # we ignored them here, the tokens would be silently dropped (zero
+            # text, zero parsed calls, zero parse errors). Treat them as
+            # successful tool calls — prompted mode in practice means "give the
+            # model tool descriptions in the system prompt and accept whatever
+            # call format it produces".
+            if raw_tool_calls:
+                for tc in raw_tool_calls:
+                    parsed = _parse_native_tool_call(tc)
+                    if isinstance(parsed, ParseError):
+                        yield ChatChunk(parse_error=parsed)
+                        continue
+                    if first_content_at is None:
+                        first_content_at = time.monotonic()
+                    yield ChatChunk(tool_call=parsed)
 
             if done:
                 if p_tok is not None:
