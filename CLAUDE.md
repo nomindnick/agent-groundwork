@@ -10,7 +10,7 @@ Read **SPEC.md** for the system design and **IMPLEMENTATION_PLAN.md** for the bu
 
 ## Current phase
 
-**Phase 2 — Bakeoff harness, complete.** All Phase 1 foundations plus `agent_groundwork/bakeoff/{harness,scoring,report,__main__}.py` and 9 scenario YAMLs in `bakeoff/scenarios/`. Run with `python -m agent_groundwork.bakeoff` once `[bakeoff].candidate_models` in `config.toml` is pointed at models actually installed in Ollama. The next step is the **Phase 2 decision point**: run the bakeoff, review `bakeoff_results/<timestamp>/report.md`, pick 3-5 finalist models, write `decision.md` next to the report, then proceed to **Phase 3** (agent core).
+**Phase 3 — Agent core, complete.** All Phase 1/2 foundations plus `agent_groundwork/agent/{events,messages,loop,compaction}.py`, top-level `agent_groundwork/tracing.py`, and `scripts/agent_smoketest.py`. The agent loop streams provider output, dispatches tools (with exception capture), enforces an iteration cap, runs compaction when history exceeds configurable thresholds, detects AGENT.md self-edits and reloads them in place, and writes a JSONL session trace. All three Phase 3 done-when criteria verified end-to-end against `gemma4:e4b` (the config default and one of the three Phase 2 finalists). The **Phase 2 decision** is recorded in `bakeoff_results/20260407-221909/decision.md` — finalists are `gemma4:e4b` (primary default), `gemma4:26b` (bigger same-family), and `gemma4:e2b` (fast specialist / candidate compaction model). Next is **Phase 4** (CLI frontend wrapping the agent core), then **Phase 5** (use-and-tune against the three finalists in real multi-step tasks, updating `decision.md` with what's learned).
 
 (Update this section as the project moves through phases.)
 
@@ -27,6 +27,12 @@ Once Phase 2 is in:
 
 ```
 python -m agent_groundwork.bakeoff       # run the bakeoff against config.toml's candidate list
+```
+
+Once Phase 3 is in:
+
+```
+python scripts/agent_smoketest.py        # one-shot end-to-end agent run (real sandbox + trace)
 ```
 
 Once Phase 4 is in:
