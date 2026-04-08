@@ -68,11 +68,3 @@ def tool_result_message(call: ToolCall, result: ToolResult) -> Message:
         tool_call_id=call.id,
         tool_name=call.name,
     )
-
-
-def build_initial_history(system_prompt: str, first_user_message: str) -> list[Message]:
-    """Build a fresh two-message history (system + first user turn)."""
-    return [
-        system_message(system_prompt),
-        user_message(first_user_message),
-    ]

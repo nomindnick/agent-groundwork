@@ -25,6 +25,7 @@ loop.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -81,6 +82,34 @@ Anything still in progress, pending, or unanswered.
 Be dense. No preamble. No apologies. Markdown only."""
 
 
+# =============================== token estimate ===============================
+
+
+def _message_token_estimate(m: Message) -> int:
+    """Rough token estimate for a full Message, including any tool calls.
+
+    `Message.content` is just the text body — assistant turns that only
+    emit tool calls have `content=""` and their payload lives in
+    `tool_calls`. Counting content alone would systematically under-count
+    tool-heavy conversations (the same class of "only looked at .content"
+    bug that commit adf0483 fixed in the provider layer).
+
+    The serialized tool_calls approximate what actually goes on the wire
+    to Ollama's chat template; good enough for a compaction heuristic.
+    """
+    total = estimate_tokens(m.content)
+    if m.tool_calls:
+        for tc in m.tool_calls:
+            total += estimate_tokens(tc.name)
+            try:
+                total += estimate_tokens(
+                    json.dumps(tc.args, ensure_ascii=False, default=str)
+                )
+            except (TypeError, ValueError):
+                total += estimate_tokens(str(tc.args))
+    return total
+
+
 # =============================== default impl ===============================
 
 
@@ -122,7 +151,7 @@ class RollingSummaryCompactor:
     def should_compact(self, history: list[Message]) -> bool:
         if len(history) > self._trigger_messages:
             return True
-        total_tokens = sum(estimate_tokens(m.content) for m in history)
+        total_tokens = sum(_message_token_estimate(m) for m in history)
         return total_tokens > self._trigger_tokens
 
     # --------------------------- main entry ---------------------------
